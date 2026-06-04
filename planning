@@ -1,0 +1,43 @@
+System Architecture Overview:
+┌──────────────────────┐             ┌─────────────────────────┐             ┌────────────────────────┐
+│     VOICE LAYER      │             │    NETWORKING LAYER     │             │   INTELLIGENCE LAYER   │
+│                      │             │                         │             │                        │
+│   [Vapi Telephony]   │ ──────────> │   [Cloudflare Tunnel]   │ ──────────> │   [FastAPI Backend]    │
+│  (STT -> LLM -> TTS) │ <────────── │  (Secure Public Proxy)  │ <────────── │  (Deterministic Rules) │
+└──────────────────────┘             └─────────────────────────┘             └────────────────────────┘
+                                                                                          │
+                                                                                          ▼
+                                                                             ┌────────────────────────┐
+                                                                             │ DATA / SYSTEMS LEDGER  │
+                                                                             │                        │
+                                                                             │   [Mock ERP / IoT]     │
+                                                                             │  (Truck & Dock Data)   │
+                                                                             └────────────────────────┘
+
+Optimistic Execution with Implicit Confirmation: repeating the data back naturally while simultaneously processing it in the background, you get both: speed and data validation.
+
+Vapi supports interruption handling (barge-in) natively. If the AI is speaking and the user talks over it, the AI instantly stops generating audio and listens to what the user is saying.
+
+[Driver says: "Stuck on Route 80, Truck 402"]
+                        │
+                        ▼
+┌──────────────────────────────────────────────┐
+│                  Vapi LLM                    │
+│ 1. Instantly fires tool call to FastAPI.     │
+│ 2. Generates conversational confirmation text.│
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+         [AI Speaks: "Got it, routing 
+          Truck 402 around Route 80..."]
+                       │
+       ┌───────────────┴───────────────┐
+       ▼                               ▼
+[Driver stays silent      [Driver interrupts: "No, 502!"]
+ or confirms: "Yes"]                   
+       │                               │
+       ▼                               ▼
+(FastAPI finish processing,   (Vapi kills speech, captures "502",
+ Agent reads final route)     fires update/rollback to FastAPI)
+
+
