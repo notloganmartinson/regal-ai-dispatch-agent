@@ -2,7 +2,8 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String
+from sqlalchemy import String, Text
+from pgvector.sqlalchemy import Vector
 
 load_dotenv()
 
@@ -36,6 +37,14 @@ class Warehouse(Base):
     eta_adjustment: Mapped[str] = mapped_column(String)
     real_address: Mapped[str] = mapped_column(String)
     maps_url: Mapped[str] = mapped_column(String)
+
+class FAQKnowledgeBase(Base):
+    __tablename__ = "faq_knowledge_base"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question: Mapped[str] = mapped_column(String)
+    answer: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[Vector] = mapped_column(Vector(1536))
 
 async def get_db():
     async with AsyncSessionLocal() as session:
