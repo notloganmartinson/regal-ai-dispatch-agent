@@ -12,7 +12,7 @@ The API processes triage requests for trucks experiencing emergency situations (
 - `backend/database.py`: SQLAlchemy 2.0 ORM models and asynchronous database session management.
 - `backend/seed_db.py`: Initialization script to create schema and populate initial test data.
 - `backend/requirements.txt`: Python dependencies.
-- `.env`: Environment variables for database configuration (not committed to version control).
+- `.env`: Environment variables for database and Twilio configuration (not committed to version control).
 
 ## API Endpoints
 
@@ -20,35 +20,14 @@ The API processes triage requests for trucks experiencing emergency situations (
 
 Processes a dispatch triage request.
 
-**Request Payload (Example):**
-
-```json
-{
-  "message": {
-    "toolWithToolCallList": [
-      {
-        "toolCall": {
-          "id": "call_123",
-          "function": {
-            "arguments": {
-              "truck_id": "402",
-              "location": "Route 80 East",
-              "crisis_type": "Engine Overheat"
-            }
-          }
-        }
-      }
-    ]
-  }
-}
-```
-
 ## Setup
 
 1. **Environment Setup:**
    Ensure PostgreSQL is running. Create a `.env` file in the project root:
    ```env
    DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dispatch_db
+   TWILIO_ACCOUNT_SID='your_sid'
+   TWILIO_SECRET_KEY='your_key'
    ```
 
 2. **Dependencies:**
@@ -67,3 +46,7 @@ Processes a dispatch triage request.
    export PYTHONPATH=$PYTHONPATH:.
    uvicorn backend.app:app --reload
    ```
+
+## Troubleshooting
+
+- **SMS Failures:** If you encounter issues sending SMS messages via Twilio, ensure your Twilio account has completed the **A2P 10DLC (Application-to-Person 10-Digit Long Code)** registration process. Twilio may block messages from unregistered numbers.
