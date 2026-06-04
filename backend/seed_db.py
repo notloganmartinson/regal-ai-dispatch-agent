@@ -12,14 +12,14 @@ async def seed_data():
             driver_name="Marcus Vance",
             cargo="Premium Refrigerated Salmon",
             status="In Transit",
-            driver_phone_number="+1-555-010-9999"  # PLACEHOLDER
+            driver_phone_number="+1-815-975-4362"  # PLACEHOLDER
         )
         truck2 = Truck(
             truck_id="502",
             driver_name="Sarah Jenkins",
             cargo="Fresh Produce / Avocados",
             status="In Transit",
-            driver_phone_number="+1-555-010-9999"  # PLACEHOLDER
+            driver_phone_number="+1-815-975-4362"  # PLACEHOLDER
         )
         
         warehouse1 = Warehouse(
