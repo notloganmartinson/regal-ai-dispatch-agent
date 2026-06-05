@@ -1,33 +1,38 @@
 # J.B. Hunt Chaos Reroute Dispatch API
 
-This is the backend service for managing fleet telemetry and automated emergency rerouting of freight shipments, utilizing a persistent PostgreSQL database.
+This is the backend service for managing fleet telemetry, automated emergency rerouting, and intelligent FAQ retrieval using vector search.
 
 ## Overview
 
-The API processes triage requests for trucks experiencing emergency situations (e.g., cargo temperature issues, mechanical failures). It validates the truck manifest against a PostgreSQL database, determines an alternative warehouse hub based on the reported location, and provides a reroute plan to the driver.
+The API processes triage requests for trucks experiencing emergency situations and provides RAG-based FAQ answers using PostgreSQL (pgvector) and Google Gemini embeddings.
 
 ## Project Structure
 
-- `backend/app.py`: FastAPI application, endpoint handler, and business logic.
-- `backend/database.py`: SQLAlchemy 2.0 ORM models and asynchronous database session management.
-- `backend/seed_db.py`: Initialization script to create schema and populate initial test data.
+- `backend/app.py`: FastAPI application, endpoints (triage, search_faqs), and business logic.
+- `backend/database.py`: SQLAlchemy 2.0 ORM models (Truck, Warehouse, FAQKnowledgeBase) and asynchronous database session management.
+- `backend/seed_db.py`: Initialization script to create schema and populate truck/warehouse data.
+- `backend/seed_faq.py`: Script to generate embeddings for FAQs using Gemini and populate the vector database.
 - `backend/requirements.txt`: Python dependencies.
-- `.env`: Environment variables for database and Twilio configuration (not committed to version control).
+- `.env`: Environment variables (DATABASE_URL, GEMINI_API_KEY, TWILIO credentials).
 
 ## API Endpoints
 
 ### POST /api/v1/dispatch/triage
+Processes a dispatch triage request from Vapi.
 
-Processes a dispatch triage request.
+### POST /api/v1/dispatch/search_faqs
+Performs a semantic vector search for FAQ answers based on a user query.
 
 ## Setup
 
 1. **Environment Setup:**
-   Ensure PostgreSQL is running. Create a `.env` file in the project root:
+   Ensure PostgreSQL (with pgvector extension) is running. Create a `.env` file:
    ```env
    DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dispatch_db
+   GEMINI_API_KEY='your_gemini_key'
    TWILIO_ACCOUNT_SID='your_sid'
-   TWILIO_SECRET_KEY='your_key'
+   TWILIO_AUTH_TOKEN='your_key'
+   TWILIO_PHONE_NUMBER='+1...'
    ```
 
 2. **Dependencies:**
@@ -38,7 +43,11 @@ Processes a dispatch triage request.
 3. **Database Initialization:**
    ```bash
    export PYTHONPATH=$PYTHONPATH:.
+   # Create schema and seed basic data
+   python3 backend/init_db.py
    python3 backend/seed_db.py
+   # Generate embeddings and seed FAQs
+   python3 backend/seed_faq.py
    ```
 
 4. **Running the Application:**
@@ -49,4 +58,5 @@ Processes a dispatch triage request.
 
 ## Troubleshooting
 
-- **SMS Failures:** If you encounter issues sending SMS messages via Twilio, ensure your Twilio account has completed the **A2P 10DLC (Application-to-Person 10-Digit Long Code)** registration process. Twilio may block messages from unregistered numbers.
+- **SMS Failures:** Ensure your Twilio account has completed the **A2P 10DLC** registration.
+- **Vector Search Failures:** Verify the `pgvector` extension is enabled in your database and that the `FAQKnowledgeBase` embedding dimension (3072) matches the model output.

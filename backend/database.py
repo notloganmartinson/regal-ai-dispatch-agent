@@ -44,7 +44,7 @@ class FAQKnowledgeBase(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     question: Mapped[str] = mapped_column(String)
     answer: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[Vector] = mapped_column(Vector(1536))
+    embedding: Mapped[Vector] = mapped_column(Vector(3072))
 
 async def get_db():
     async with AsyncSessionLocal() as session:

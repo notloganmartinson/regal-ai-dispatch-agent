@@ -1,13 +1,20 @@
-# app.py
 import os
+import logging
 from fastapi import FastAPI, Request, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from backend.database import get_db, Truck, Warehouse
+from backend.database import get_db, Truck, Warehouse, FAQKnowledgeBase
 from twilio.rest import Client
 from dotenv import load_dotenv
+from pydantic import BaseModel
+import google.generativeai as genai
 
 load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # --- TWILIO SETUP ---
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
@@ -15,6 +22,9 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 
 twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) if TWILIO_ACCOUNT_SID else None
+
+class FAQQuery(BaseModel):
+    query: str
 
 def send_dispatch_sms(driver_phone: str, truck_id: str, hub_name: str, real_address: str, maps_url: str):
     """Fires a synchronous SMS through Twilio. We run this in a FastAPI Background Task."""
@@ -40,6 +50,86 @@ app = FastAPI(title="J.B. Hunt Chaos Reroute Dispatch API")
 @app.get("/")
 async def root():
     return {"status": "online", "system": "J.B. Hunt Dispatch Automation Backend"}
+
+@app.post("/api/v1/dispatch/search_faqs")
+async def search_dispatch_faqs(request: Request, db: AsyncSession = Depends(get_db)):
+    payload = await request.json()
+    logger.info(f"DEBUG: Incoming Vapi Payload: {payload}")
+    
+    # 1. Inspect structure
+    if "message" in payload:
+        logger.info(f"DEBUG: Message structure: {payload['message'].keys()}")
+        if "toolCallList" in payload["message"]:
+             logger.info(f"DEBUG: toolCallList found. Count: {len(payload['message']['toolCallList'])}")
+    
+    # Handle Vapi's official tool-call format
+    if "message" in payload and (payload["message"].get("type") == "tool-calls" or "toolCallList" in payload["message"]):
+        results = []
+        # Support both 'toolCallList' or 'toolWithToolCallList' based on previous logs/experience
+        tool_calls = payload["message"].get("toolCallList") or payload["message"].get("toolWithToolCallList") or []
+        
+        for tool_call in tool_calls:
+            # Normalize to handle variations in Vapi payloads
+            tc_data = tool_call.get("toolCall") if "toolCall" in tool_call else tool_call
+            
+            tool_call_id = tc_data.get("id")
+            function_data = tc_data.get("function", {})
+            arguments = function_data.get("arguments", {})
+            
+            logger.info(f"DEBUG: Processing tool call: {tool_call_id}, args: {arguments}")
+            
+            # Arguments might be a string (JSON) or a dict depending on Vapi configuration.
+            import json
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    pass
+            
+            driver_query = arguments.get("query")
+            
+            # Vector Search
+            if driver_query:
+                result = genai.embed_content(
+                    model="models/gemini-embedding-001",
+                    content=driver_query,
+                    task_type="retrieval_query"
+                )
+                embedding = result['embedding']
+                stmt = select(FAQKnowledgeBase).order_by(FAQKnowledgeBase.embedding.cosine_distance(embedding)).limit(1)
+                db_res = await db.execute(stmt)
+                faq = db_res.scalar_one_or_none()
+                raw_answer = faq.answer if faq else "I am sorry, I could not find a relevant answer in the FAQ."
+            else:
+                raw_answer = "I could not understand your query."
+                
+            safe_answer = raw_answer.replace("\n", " ").strip()
+            
+            results.append({
+                "toolCallId": tool_call_id,
+                "result": {"answer": safe_answer}
+            })
+            
+        vapi_response = {"results": results}
+        logger.info(f"Outgoing Vapi Response: {vapi_response}")
+        return vapi_response
+
+    # 2. Fallback: Local testing
+    driver_query = payload.get("query")
+    if driver_query:
+        result = genai.embed_content(
+            model="models/gemini-embedding-001",
+            content=driver_query,
+            task_type="retrieval_query"
+        )
+        embedding = result['embedding']
+        stmt = select(FAQKnowledgeBase).order_by(FAQKnowledgeBase.embedding.cosine_distance(embedding)).limit(1)
+        db_res = await db.execute(stmt)
+        faq = db_res.scalar_one_or_none()
+        raw_answer = faq.answer if faq else "I am sorry, I could not find a relevant answer in the FAQ."
+        return {"answer": raw_answer}
+
+    return {"results": []}
 
 @app.post("/api/v1/dispatch/triage")
 async def triage_dispatch(request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
