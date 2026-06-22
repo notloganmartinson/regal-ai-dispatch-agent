@@ -1,0 +1,22 @@
+venv/
+__pycache__/
+*.pyc
+*.env
+
+# IDE/Editor specific
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Database files
+*.db
+*.sqlite3
+*.sql
+*.dump
+
+# Project specific temporary folders
+.pytest_cache/
+.coverage
